@@ -37,3 +37,9 @@ class State:
             if pos not in self.box_positions:
                 distance += 1
         return distance
+
+    def __lt__(self, o):
+        return self.cost < o.cost
+
+    def __eq__(self, o):
+        return self.box_positions == o.box_positions and self.player_position == o.player_position
