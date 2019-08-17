@@ -141,12 +141,14 @@ class SokobanSolver:
 
             # Push into heap with heapq (cost, state)
             for state in next_states:
+                # Only push to heap if not already visited and not already in heap.
                 if state not in self.visited and (state.cost, state) not in self.frontier:
                     for old_cost, old_state in self.frontier:
-                        # If the same state is in frontier, replace if lower cost.
+                        # Remove same state of higher cost.
                         if state == old_state and state.cost < old_cost:
                             self.frontier.remove((old_cost, old_state))
                             heapq.heapify(self.frontier)
+                            break
                     heapq.heappush(self.frontier, (state.cost, state))
         return None
 
