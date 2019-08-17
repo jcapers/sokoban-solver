@@ -10,19 +10,12 @@ Sokoban Solver, AI Assignment 1 for COMP3702, Semester 2 2019, University of Que
 ## Usage
 Defined by spec: python ProgramName.py inputFileName outputFileName
 
-Where inputFile and outputFile are text files depicting a Sokoban map. For example:
+Where inputFile and outputFile are text files depicting a Sokoban map. See */testcases* for text of Sokoban maps.
 
-&#35;&#35;&#35;&#35;&#35;&#35;
+## About Sokoban
+### Sokoban Map Symbols
 
-&#35;   P&#35;
-
-&#35;  B &#35;
-
-&#35;    &#35;
-
-&#35;T   &#35;
-
-&#35;&#35;&#35;&#35;&#35;&#35;
+As we are limited in representation, the following symbols are used:
 
 &#35;: Walls
 
@@ -31,6 +24,3 @@ P: Player
 T: Target
 
 B: Box
-
-See /testcases for text of Sokoban maps.
-
