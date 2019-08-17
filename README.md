@@ -10,14 +10,14 @@ Defined by spec: python ProgramName.py inputFileName outputFileName
 
 Where inputFile and outputFile are text files depicting a Sokoban map. For example:
 
-######
-#   P#
-#  B #
-#    #
-#T   #
-######
+&#35;&#35;&#35;&#35;&#35;&#35;
+&#35;   P&#35;
+&#35;  B &#35;
+&#35;    &#35;
+&#35;T   &#35;
+&#35;&#35;&#35;&#35;&#35;&#35;
 
-#: Walls
+&#35;: Walls
 
 P: Player
 
