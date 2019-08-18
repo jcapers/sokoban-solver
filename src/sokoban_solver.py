@@ -150,19 +150,20 @@ class SokobanSolver:
             # Compute heuristic if A* and update cost
             if strategy is SearchStrategy.AStar:
                 for state in next_states:
-                    state.cost += self.heuristic(state)
+                    state.h_cost += self.heuristic(state)
 
             # Push into heap with heapq (cost, state)
             for state in next_states:
+                f_cost = state.cost + state.h_cost
                 # Only push to heap if not already visited and not already in heap.
-                if state not in self.visited and (state.cost, state) not in self.frontier:
+                if state not in self.visited and (f_cost, state) not in self.frontier:
                     for old_cost, old_state in self.frontier:
                         # Remove same state of higher cost.
-                        if state == old_state and state.cost < old_cost:
+                        if state == old_state and f_cost < old_cost:
                             self.frontier.remove((old_cost, old_state))
                             heapq.heapify(self.frontier)
                             break
-                    heapq.heappush(self.frontier, (state.cost, state))
+                    heapq.heappush(self.frontier, (f_cost, state))
         return None
 
     def goal_test(self, state):

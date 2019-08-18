@@ -18,25 +18,20 @@ class State:
         if self.parent is None:
             self.cost = 0
         else:
-            self.cost = self.parent.cost + self.distance_to_parent()
+            self.cost = self.compute_cost()
+        self.h_cost = 0
 
-    def distance_to_parent(self):
+    def compute_cost(self):
         """
-        Computes the distance from this state, to another state.
+        Computes the distance from this state, to root node.
+        This represents g(n) in f(n) = g(n) + h(n).
 
         Distance increments at least 1 since the player always moves on each step.
-        If a box has been successfully moved, then the box has moved by a distance of 1 as well.
-
-        For the purposes of the Sokoban Solver, distance g(n) is only relevant to the immediate parent.
 
         :return: Distance cost from parent to this State.
         """
-        distance = 1
-        # Get box cost, if a box has moved from last state then increment cost.
-        for pos in self.parent.box_positions:
-            if pos not in self.box_positions:
-                distance += 1
-        return distance
+        cost_per_move = 1
+        return self.parent.cost + cost_per_move
 
     def __lt__(self, o):
         return self.cost < o.cost
