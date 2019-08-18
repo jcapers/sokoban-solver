@@ -1,5 +1,0 @@
-UCS Took: 0.03191351890563965 secs
-Path: l,l,u,l,l,d,u,r,r,d,d,l,l,l,d,l,l,u,u,r,d,d,l,d,r,r
-Number of nodes: 971
-Number of frontier nodes left: 25
-Number of visited nodes: 368

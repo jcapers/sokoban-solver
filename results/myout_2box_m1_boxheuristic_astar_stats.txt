@@ -1,5 +1,0 @@
-A* Took: 0.000997304916381836 secs
-Path: u,u,l,l,d,d,l,l,u,l,l,d,r
-Number of nodes: 103
-Number of frontier nodes left: 3
-Number of visited nodes: 48
