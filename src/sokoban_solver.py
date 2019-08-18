@@ -1,5 +1,5 @@
 from enum import Enum
-from typing import List
+from typing import List, Tuple
 import heapq
 import os
 import sys
@@ -12,9 +12,16 @@ from sokoban_map import SokobanMap
 """
 COMP3702 Assignment 1: Sokoban Solver
 
+Implementation of UCS and A* based on [1] and [2].
+
+Deadlock implementation based on [3] and [4] though not all deadlock solutions have
+been implemented in this solution.
+
 References
 [1]
 [2]
+[3]
+[4]
 """
 
 
@@ -48,50 +55,56 @@ class SokobanSolver:
         Run the Sokoban Solver and process outputs to stdout and path solution to output_file.
         :return:
         """
+        # UCS Search from until path generated.
         print(f'Started UCS Search...')
         self.frontier.clear()
         self.visited.clear()
         self.nodes_generated = 0
         start = time.time()
         final_state = self.search(SearchStrategy.UCS)
-        end = time.time()
-        print(f'UCS Took: {end - start} secs')
-        print(f'Result boxes: {final_state.box_positions}')
-        print(f'Goal: {self.sokoban_map.tgt_positions}')
+        if final_state is None:
+            print('Failed to find solution...')
+            return
         print('\nFinding path...')
         path = self.find_path(final_state)
+        end = time.time()
+
+        # Output
         ucs_output_path = self.output_file + '_ucs_path.txt'
         with open(ucs_output_path, 'w+') as f:
             f.write(",".join(path))
         ucs_stats_path = self.output_file + '_ucs_stats.txt'
         with open(ucs_stats_path, 'w+') as f:
             f.write(f'UCS Took: {end - start} secs\n')
-            f.write(f'Path: {",".join(path)}\n')
-            f.write(f'Number of nodes: {self.nodes_generated}\n')
+            f.write(f'Path ({len(path)} steps): {",".join(path)}\n')
+            f.write(f'Number of nodes generated: {self.nodes_generated}\n')
             f.write(f'Number of frontier nodes left: {len(self.frontier)}\n')
             f.write(f'Number of visited nodes: {len(self.visited)}\n')
         print(f'Path saved to {ucs_output_path}')
 
+        # AStar search until path generated.
         print(f'Started A* Search...')
         self.frontier.clear()
         self.visited.clear()
         self.nodes_generated = 0
         start = time.time()
         final_state = self.search(SearchStrategy.AStar)
-        end = time.time()
-        print(f'A* Took: {end - start} secs')
-        print(f'Result boxes: {final_state.box_positions}')
-        print(f'Goal: {self.sokoban_map.tgt_positions}')
+        if final_state is None:
+            print('Failed to find state...')
+            return
         print('\nFinding path...')
         path = self.find_path(final_state)
+        end = time.time()
+
+        # Output
         astar_output_path = self.output_file + '_astar_path.txt'
         with open(astar_output_path, 'w+') as f:
             f.write(",".join(path))
         astar_stats_path = self.output_file + '_astar_stats.txt'
         with open(astar_stats_path, 'w+') as f:
             f.write(f'A* Took: {end - start} secs\n')
-            f.write(f'Path: {",".join(path)}\n')
-            f.write(f'Number of nodes: {self.nodes_generated}\n')
+            f.write(f'Path ({len(path)} steps): {",".join(path)}\n')
+            f.write(f'Number of nodes generated: {self.nodes_generated}\n')
             f.write(f'Number of frontier nodes left: {len(self.frontier)}\n')
             f.write(f'Number of visited nodes: {len(self.visited)}\n')
         print(f'Path saved to {astar_output_path}')
@@ -169,17 +182,17 @@ class SokobanSolver:
         Computes heuristic for state.
 
         Heuristic is calculated by:
-        1) Distance player is from nearest box.
+        1) Distance player from all boxes.
         2) Distance each box is from nearest goal.
-        :param state:
-        :return:
+        :param state: state to calculate a heuristic for.
+        :return: cost for the given state.
         """
         boxes = state.box_positions
         player = state.player_position
         goals = self.sokoban_map.tgt_positions
         h_cost = 0
 
-        # # Player
+        # Player
         # player_costs = [self.manhattan_distance(player, box) for box in boxes]
         # h_cost += min(player_costs)
 
@@ -193,9 +206,9 @@ class SokobanSolver:
     def manhattan_distance(self, a, b):
         """
         Computes manhattan distance of two positions.
-        :param state1:
-        :param state2:
-        :return:
+        :param a: Coordinate tuple, (y, x)
+        :param b: Coordinate tuple to calculate distance to a, (y, x)
+        :return: manhattan distance between a and b
         """
         return abs(a[0] - b[0]) + abs(a[1] - b[1])
 
@@ -223,6 +236,12 @@ class SokobanSolver:
             -- Box cannot be moved if obstacle or another box is in the way.
 
         Modified from sokoban_map.apply_move.
+
+        Deadlocks
+        1) Check if a box can reach a target (e.g., if the box is along the top wall,
+           it can only reach targets along the top wall)
+        2) Check corners and sides, i.e,. box blocked on side and (top or bottom).
+        2) Check when box is blocked vertically or horizontally, and also blocked once in other direction.
 
         :param state: Current state where move begins.
         :param move: Possible move, string representing move.
@@ -279,12 +298,147 @@ class SokobanSolver:
                     new_box_x = new_x
                     box_moved = True
 
+        # If a box has been moved, check if the box is now deadlocked, okay if it's in a goal position.
+        if box_moved and (new_box_y, new_box_x) not in self.sokoban_map.tgt_positions:
+            if self.deadlock_test(new_box_y, new_box_x, state):
+                return False
         # Create new state
         new_box_positions = state.box_positions[:]
         if box_moved:
             new_box_positions.remove((new_y, new_x))
             new_box_positions.append((new_box_y, new_box_x))
         return State(state, new_box_positions, (new_y, new_x), move)
+
+    def deadlock_test(self, box_y, box_x, state):
+        """
+        Test if a deadlock exists with box position.
+        :param box_y:
+        :param box_x:
+        :param state:
+        :return:
+        """
+        # Prepare some variables for ease
+        goals = self.sokoban_map.tgt_positions
+        obstacles = self.sokoban_map.obstacle_map
+        x_edges = (1, self.sokoban_map.x_size - 2)
+        y_edges = (1, self.sokoban_map.y_size - 2)
+
+        # Check all deadlock cases
+        if box_y in y_edges or box_x in x_edges:
+            # Special deadlock case if box is against edge of map.
+            if self.deadlock_wall_check(box_y, box_x, x_edges, y_edges, goals, obstacles, state):
+                return True
+        # Freeze deadlock can be checked now, as edge case passed.
+        elif self.deadlock_freeze_check(box_y, box_x, obstacles, state):
+            return True
+
+        return False
+
+    def deadlock_wall_check(self, box_y, box_x, x_edges, y_edges, goals, obstacles, state):
+        """
+        Deadlock checking based on sokobano wiki [3][4].
+        Simple check to see if a box can reach the target from the walls.
+
+        1) If a box is against the walls, then it can only move to targets also against the walls.
+        2) If the box is against a wall then it may be blocked by other obstacles.
+           -- Note for now this just checks against obstacles/walls, not other boxes.
+
+        :return: True if deadlocked, else False.
+        """
+        goals_x = [x for y, x in goals]
+        goals_y = [y for y, x in goals]
+        # If the box is against a wall of the map then it can only traverse along this wall.
+        # Check sides
+        if box_x == x_edges[0] or box_x == x_edges[1]:
+            if box_x not in goals_x:
+                return True
+            elif (box_y - 1, box_x) in (obstacles or state.box_positions) \
+                    or (box_y + 1, box_x) in (obstacles or state.box_positions):
+                return True
+
+        # Check top/bottom
+        if box_y == y_edges[0] or box_y == y_edges[1]:
+            if box_y not in goals_y:
+                return True
+            elif (box_y, box_x - 1) in (obstacles or state.box_positions) \
+                    or (box_y, box_x + 1) in (obstacles or state.box_positions):
+                return True
+
+        # Safe!
+        return False
+
+    def deadlock_freeze_check(self, box_y, box_x, obstacles, state):
+        """
+        Checks freeze deadlock case [3] [4].
+
+        Uses deadlock_horizontal_check and deadlock_vertical_check.
+
+        :param box_y:
+        :param box_x:
+        :param obstacles:
+        :param state:
+        :return:
+        """
+        # Deep copy of list in case we need to add boxes.
+        obstacles_check_list = obstacles[:]
+        # Check horizontal directions.
+
+        # If one horizontal direction is blocked by a wall, check vertical.
+
+            # If vertical is blocked, return true.
+
+            # If vertical is not blocked, check if a box is in a vertical space (and not temporarily treated as a wall)
+
+                # If yes, run the check vertical test but add this box into obstacles to be treated as a wall, return true if this subsequent test passes.
+
+        # Check vertical directions.
+
+            # Repeat as above
+
+        # Got here, so not blocked.
+        return False
+
+    def deadlock_horizontal_check(self, box_y, box_x, obstacles):
+        """
+        Checks horizontal deadlock case where box is blocked horizontally, and
+        might be blocked in at least one vertical direction, hence causing a
+        deadlock.
+
+        :param box_y:
+        :param box_x:
+        :param obstacles:
+        :param state:
+        :return:
+        """
+        # Check horizontal directions.
+
+        # If one horizontal direction is blocked by a wall, check vertical.
+
+        # If vertical is blocked, return true.
+
+        return False
+
+    def deadlock_vertical_check(self, box_y, box_x, obstacles):
+        """
+        Checks vertical deadlock case where box is blocked vertically, and may
+        be blocked in at least one horizontal direction, hence causing a
+        deadlock.
+
+        :param box_y:
+        :param box_x:
+        :param obstacles:
+        :param state:
+        :return:
+        """
+        # Check vertical directions.
+
+        # If one vertical direction is blocked by a wall, check horizontal.
+
+        # If horizontal is blocked, return true.
+
+        return False
+
+
 
 
 def main(arglist: List[str]):
