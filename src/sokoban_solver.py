@@ -194,8 +194,8 @@ class SokobanSolver:
         h_cost = 0
 
         # Player
-        # player_costs = [self.manhattan_distance(player, box) for box in boxes]
-        # h_cost += min(player_costs)
+        player_costs = [self.manhattan_distance(player, box) for box in boxes]
+        h_cost += min(player_costs)
 
         # Boxes
         for box in boxes:
