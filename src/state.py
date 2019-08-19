@@ -36,5 +36,8 @@ class State:
     def __lt__(self, o):
         return self.cost < o.cost
 
+    def __gt__(self, o):
+        return self.cost > o.cost
+
     def __eq__(self, o):
         return self.box_positions == o.box_positions and self.player_position == o.player_position

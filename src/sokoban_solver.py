@@ -351,8 +351,10 @@ class SokobanSolver:
         # If the box is against a wall of the map then it can only traverse along this wall.
         # Check sides
         if box_x == x_edges[0] or box_x == x_edges[1]:
+            # Goal not on same side/column, impossible to reach goal.
             if box_x not in goals_x:
                 return True
+            # Goal is in line, but blocked so can't push. Other boxes would also be stuck against wall.
             elif (box_y - 1, box_x) in (obstacles or state.box_positions) \
                     or (box_y + 1, box_x) in (obstacles or state.box_positions):
                 return True
@@ -372,7 +374,7 @@ class SokobanSolver:
         """
         Checks freeze deadlock case [3] [4].
 
-        Uses deadlock_horizontal_check and deadlock_vertical_check.
+        Uses blocked_horizontal and blocked_vertical to check blockages.
 
         :param box_y:
         :param box_x:
@@ -383,7 +385,8 @@ class SokobanSolver:
         # Deep copy of list in case we need to add boxes.
         obstacles_check_list = obstacles[:]
         # Check horizontal directions.
-
+        if self.blocked_horizontal(box_y, box_x, obstacles_check_list):
+            return True
         # If one horizontal direction is blocked by a wall, check vertical.
 
             # If vertical is blocked, return true.
@@ -393,50 +396,45 @@ class SokobanSolver:
                 # If yes, run the check vertical test but add this box into obstacles to be treated as a wall, return true if this subsequent test passes.
 
         # Check vertical directions.
-
+        if self.blocked_vertical(box_y, box_x, obstacles_check_list):
+            return True
             # Repeat as above
 
         # Got here, so not blocked.
         return False
 
-    def deadlock_horizontal_check(self, box_y, box_x, obstacles):
+    def blocked_horizontal(self, box_y, box_x, obstacles):
         """
-        Checks horizontal deadlock case where box is blocked horizontally, and
-        might be blocked in at least one vertical direction, hence causing a
-        deadlock.
+        Checks if box is blocked horizontally by obstacles.
+
+        Obstacles are generally walls, but can be boxes if box
+        already checked in deadlocks.
 
         :param box_y:
         :param box_x:
         :param obstacles:
-        :param state:
         :return:
         """
         # Check horizontal directions.
-
-        # If one horizontal direction is blocked by a wall, check vertical.
-
-        # If vertical is blocked, return true.
-
+        if (box_y, box_x - 1) in obstacles or (box_y, box_x + 1) in obstacles:
+            return True
         return False
 
-    def deadlock_vertical_check(self, box_y, box_x, obstacles):
+    def blocked_vertical(self, box_y, box_x, obstacles):
         """
-        Checks vertical deadlock case where box is blocked vertically, and may
-        be blocked in at least one horizontal direction, hence causing a
-        deadlock.
+        Checks if box is blocked vertically by obstacles.
+
+        Obstacles are generally walls, but can be boxes if box
+        already checked in deadlocks.
 
         :param box_y:
         :param box_x:
         :param obstacles:
-        :param state:
         :return:
         """
         # Check vertical directions.
-
-        # If one vertical direction is blocked by a wall, check horizontal.
-
-        # If horizontal is blocked, return true.
-
+        if (box_y - 1, box_x) in obstacles or (box_y + 1, box_x) in obstacles:
+            return True
         return False
 
 
