@@ -1,7 +1,6 @@
 from enum import Enum
 from typing import List, Tuple
 import heapq
-import os
 import sys
 import time
 
@@ -14,14 +13,16 @@ COMP3702 Assignment 1: Sokoban Solver
 
 Implementation of UCS and A* based on [1] and [2].
 
-Deadlock implementation based on [3] and [4] though not all deadlock solutions have
-been implemented in this solution.
+Freeze Deadlock implementation based on [3] though not all deadlock solutions have
+been implemented on this page (e.g., have not implemented Simple Deadlocks).
 
 References
-[1]
-[2]
-[3]
-[4]
+[1] S. Russell, P. Norvig, Artificial Intelligence: A Modern Approach, 3rd ed. 
+    Essex, England: Pearson Education, 2016
+[2] A. Bialkowski, Lecture, Topic: "Search in Discrete Space." COMP3702, 
+    ITEE-EAIT, University of Queensland. Aug, 2019.
+[3] How to detect deadlocks - Sokoban Wiki. Accessed Sept. 09. 2019. 
+    [Online] Available: http://sokobano.de/wiki/index.php?title=How_to_detect_deadlocks
 """
 
 
@@ -33,7 +34,7 @@ class SearchStrategy(Enum):
 class SokobanSolver:
     """Sokoban Solver, utilises Uniform Cost Search OR A* Search."""
 
-    def __init__(self, input_filename: str, output_filename: str):
+    def __init__(self, input_filename: str, output_filename: str, search_strategy: str = 'AStar'):
         self.map_file = input_filename
         self.output_file = output_filename
 
@@ -45,9 +46,10 @@ class SokobanSolver:
                       'DOWN': 'd'}
 
         # Setup for search
+        self.search_strategy = search_strategy
         self.initial_state = State(None, self.sokoban_map.box_positions[:], self.sokoban_map.player_position)
         self.frontier = []
-        self.visited = []
+        self.visited = {}
         self.nodes_generated = 0
 
     def solve_sokoban(self):
@@ -55,59 +57,41 @@ class SokobanSolver:
         Run the Sokoban Solver and process outputs to stdout and path solution to output_file.
         :return:
         """
-        # UCS Search from until path generated.
-        print(f'Started UCS Search...')
-        self.frontier.clear()
-        self.visited.clear()
-        self.nodes_generated = 0
-        start = time.time()
-        final_state = self.search(SearchStrategy.UCS)
+        if self.search_strategy == 'UCS':
+            # Do UCS
+            print('Started UCS Search...')
+            start = time.time()
+            final_state = self.search(SearchStrategy.UCS)
+        else:
+            # DO ASTAR
+            print('Started A* Search...')
+            start = time.time()
+            final_state = self.search(SearchStrategy.AStar)
+
         if final_state is None:
             print('Failed to find solution...')
             return
-        print('\nFinding path...')
-        path = self.find_path(final_state)
-        end = time.time()
+        else:
+            print('\nFinding path...')
+            path = self.find_path(final_state)
+            end = time.time()
 
-        # Output
-        ucs_output_path = self.output_file + '_ucs_path.txt'
-        with open(ucs_output_path, 'w+') as f:
+        # Output Path
+        print(f'Path ({len(path)}) steps: {path}')
+        output_path = f'{self.output_file}_{self.search_strategy}_path.txt'
+        with open(output_path, 'w+') as f:
             f.write(",".join(path))
-        ucs_stats_path = self.output_file + '_ucs_stats.txt'
-        with open(ucs_stats_path, 'w+') as f:
-            f.write(f'UCS Took: {end - start} secs\n')
+
+        # Output Stats
+        print(f'Nodes Gen.: {self.nodes_generated}, Fringe: {len(self.frontier)}, Explored: {len(self.visited)}, Time: {round(end-start, 4)} secs')
+        stats_path = f'{self.output_file}_{self.search_strategy}_stats.txt'
+        with open(stats_path, 'w+') as f:
             f.write(f'Path ({len(path)} steps): {",".join(path)}\n')
             f.write(f'Number of nodes generated: {self.nodes_generated}\n')
             f.write(f'Number of frontier nodes left: {len(self.frontier)}\n')
             f.write(f'Number of visited nodes: {len(self.visited)}\n')
-        print(f'Path saved to {ucs_output_path}')
-
-        # AStar search until path generated.
-        print(f'Started A* Search...')
-        self.frontier.clear()
-        self.visited.clear()
-        self.nodes_generated = 0
-        start = time.time()
-        final_state = self.search(SearchStrategy.AStar)
-        if final_state is None:
-            print('Failed to find state...')
-            return
-        print('\nFinding path...')
-        path = self.find_path(final_state)
-        end = time.time()
-
-        # Output
-        astar_output_path = self.output_file + '_astar_path.txt'
-        with open(astar_output_path, 'w+') as f:
-            f.write(",".join(path))
-        astar_stats_path = self.output_file + '_astar_stats.txt'
-        with open(astar_stats_path, 'w+') as f:
-            f.write(f'A* Took: {end - start} secs\n')
-            f.write(f'Path ({len(path)} steps): {",".join(path)}\n')
-            f.write(f'Number of nodes generated: {self.nodes_generated}\n')
-            f.write(f'Number of frontier nodes left: {len(self.frontier)}\n')
-            f.write(f'Number of visited nodes: {len(self.visited)}\n')
-        print(f'Path saved to {astar_output_path}')
+            f.write(f'{self.search_strategy} Time: {end - start} secs\n')
+        print(f'Path saved to {output_path}, Stats to {stats_path}')
 
     def find_path(self, final_state):
         """
@@ -135,6 +119,9 @@ class SokobanSolver:
         :param strategy: Search Strategy to apply (UCS or A*)
         :return: Goal state node, or none if failed.
         """
+        self.frontier.clear()
+        self.visited.clear()
+        self.nodes_generated = 0
         # Initialise min priority queue with the starting state, and reset.
         heapq.heappush(self.frontier, (self.initial_state.cost, self.initial_state))
 
@@ -143,7 +130,7 @@ class SokobanSolver:
             cost, current_state = heapq.heappop(self.frontier)
             if self.goal_test(current_state):
                 return current_state
-            self.visited.append(current_state)
+            self.visited[current_state] = current_state
             next_states = self.next_states(current_state)
             self.nodes_generated += len(next_states)
 
@@ -156,10 +143,11 @@ class SokobanSolver:
             for state in next_states:
                 f_cost = state.cost + state.h_cost
                 # Only push to heap if not already visited and not already in heap.
-                if state not in self.visited and (f_cost, state) not in self.frontier:
+                if not self.visited.get(state, False):
+                # if state not in self.visited:
                     for old_cost, old_state in self.frontier:
                         # Remove same state of higher cost.
-                        if state == old_state and f_cost < old_cost:
+                        if state == old_state and f_cost <= old_cost:
                             self.frontier.remove((old_cost, old_state))
                             heapq.heapify(self.frontier)
                             break
@@ -183,8 +171,14 @@ class SokobanSolver:
         Computes heuristic for state.
 
         Heuristic is calculated by:
-        1) Distance player from all boxes.
+        1) Distance player to closest box.
+           -- This is the min manhattan distance a player must move to attempt
+           to push a box.
         2) Distance each box is from nearest goal.
+           -- This is the min manhattan distance a box must be pushed to reach
+           a goal.
+           -- If a box is already on a goal, then the heuristic will be smaller
+           to reflect closeness to final goal state.
         :param state: state to calculate a heuristic for.
         :return: cost for the given state.
         """
@@ -207,6 +201,7 @@ class SokobanSolver:
     def manhattan_distance(self, a, b):
         """
         Computes manhattan distance of two positions.
+
         :param a: Coordinate tuple, (y, x)
         :param b: Coordinate tuple to calculate distance to a, (y, x)
         :return: manhattan distance between a and b
@@ -232,17 +227,14 @@ class SokobanSolver:
         """
         Test if move is valid.
 
+        Criteria:
         1) Check Obstacles, player cannot move into obstacles
         2) If a box is in the new position, check if the box can be moved.
             -- Box cannot be moved if obstacle or another box is in the way.
+        3) Move must not send a box into a deadlock state (at least the deadlocks
+           that are currently detectable).
 
         Modified from sokoban_map.apply_move.
-
-        Deadlocks
-        1) Check if a box can reach a target (e.g., if the box is along the top wall,
-           it can only reach targets along the top wall)
-        2) Check corners and sides, i.e,. box blocked on side and (top or bottom).
-        2) Check when box is blocked vertically or horizontally, and also blocked once in other direction.
 
         :param state: Current state where move begins.
         :param move: Possible move, string representing move.
@@ -313,10 +305,10 @@ class SokobanSolver:
     def deadlock_test(self, box_y, box_x, state):
         """
         Test if a deadlock exists with box position.
-        :param box_y:
-        :param box_x:
-        :param state:
-        :return:
+        :param box_y: y coordinate for box.
+        :param box_x: x coordinate for box.
+        :param state: current state we are checking for deadlocks in.
+        :return: True if deadlock detected.
         """
         # Prepare some variables for ease
         goals = self.sokoban_map.tgt_positions
@@ -331,19 +323,26 @@ class SokobanSolver:
                 return True
         # Freeze deadlock can be checked now, as edge case passed.
         elif self.deadlock_freeze_check(box_y, box_x, obstacles, state):
+            print(f'Freeze deadlock true: {box_y, box_x}, cost: {state.cost}, h: {state.h_cost}')
             return True
 
         return False
 
     def deadlock_wall_check(self, box_y, box_x, x_edges, y_edges, goals, obstacles, state):
         """
-        Deadlock checking based on sokobano wiki [3][4].
-        Simple check to see if a box can reach the target from the walls.
+        Simple check to see if a box can reach the target from the walls, if not
+        then it will never be pushable off the wall.
 
         1) If a box is against the walls, then it can only move to targets also against the walls.
-        2) If the box is against a wall then it may be blocked by other obstacles.
-           -- Note for now this just checks against obstacles/walls, not other boxes.
+        2) If the box is against a wall then it may be blocked by other obstacles or boxes.
 
+        :param box_y: y coordinate of box.
+        :param box_x: x coordinate of box.
+        :param x_edges: general x positions at edge of map that is traversable.
+        :param y_edges: general y positions at edge of map that is traversable.
+        :param goals: list containing goal/target coordinates.
+        :param obstacles: list containing obstacle coordinates.
+        :param state: current state we are checking for deadlocks in.
         :return: True if deadlocked, else False.
         """
         goals_x = [x for y, x in goals]
@@ -372,33 +371,46 @@ class SokobanSolver:
 
     def deadlock_freeze_check(self, box_y, box_x, obstacles, state):
         """
-        Checks freeze deadlock case [3] [4].
+        Checks freeze deadlock case [3].
 
         Uses blocked_horizontal and blocked_vertical to check blockages.
 
-        :param box_y:
-        :param box_x:
-        :param obstacles:
-        :param state:
-        :return:
+        :param box_y: y position of box.
+        :param box_x: x position of box.
+        :param obstacles: obstacle coordinates on current sokoban map.
+        :param state: current state we are finding successors for.
+        :return: True if a freeze deadlock is detected.
         """
         # Deep copy of list in case we need to add boxes.
         obstacles_check_list = obstacles[:]
         # Check horizontal directions.
         if self.blocked_horizontal(box_y, box_x, obstacles_check_list):
-            return True
-        # If one horizontal direction is blocked by a wall, check vertical.
-
-            # If vertical is blocked, return true.
-
+            # If one horizontal direction is blocked by a wall, check vertical.
+            if self.blocked_vertical(box_y, box_x, obstacles_check_list):
+                return True
             # If vertical is not blocked, check if a box is in a vertical space (and not temporarily treated as a wall)
+            elif (box_y - 1, box_x) in state.box_positions and not (box_y - 1, box_x) in obstacles_check_list:
+                obstacles_check_list.append((box_y, box_x))
+                # Treat THIS box as a standard obstacle to avoid circular checks.
+                if self.deadlock_freeze_check(box_y - 1, box_x, obstacles_check_list, state):
+                    return True
+            elif (box_y + 1, box_x) in state.box_positions and not (box_y + 1, box_x) in obstacles_check_list:
+                obstacles_check_list.append((box_y, box_x))
+                if self.deadlock_freeze_check(box_y + 1, box_x, obstacles_check_list, state):
+                    return True
 
-                # If yes, run the check vertical test but add this box into obstacles to be treated as a wall, return true if this subsequent test passes.
-
-        # Check vertical directions.
+        # Check vertical directions, similar to horizontal check but reversed.
         if self.blocked_vertical(box_y, box_x, obstacles_check_list):
-            return True
-            # Repeat as above
+            if self.blocked_horizontal(box_y, box_x, obstacles_check_list):
+                return True
+            elif (box_y, box_x - 1) in state.box_positions and not (box_y, box_x - 1) in obstacles_check_list:
+                obstacles_check_list.append((box_y, box_x))
+                if self.deadlock_freeze_check(box_y, box_x - 1, obstacles_check_list, state):
+                    return True
+            elif (box_y, box_x + 1) in state.box_positions and not (box_y, box_x + 1) in obstacles_check_list:
+                obstacles_check_list.append((box_y, box_x))
+                if self.deadlock_freeze_check(box_y, box_x + 1, obstacles_check_list, state):
+                    return True
 
         # Got here, so not blocked.
         return False
@@ -410,10 +422,10 @@ class SokobanSolver:
         Obstacles are generally walls, but can be boxes if box
         already checked in deadlocks.
 
-        :param box_y:
-        :param box_x:
-        :param obstacles:
-        :return:
+        :param box_y: y coordinate of box.
+        :param box_x: x coordinate of box.
+        :param obstacles: obstacle coordinates of current sokoban map.
+        :return: True if box is blocked horizontally (x-axis).
         """
         # Check horizontal directions.
         if (box_y, box_x - 1) in obstacles or (box_y, box_x + 1) in obstacles:
@@ -427,10 +439,10 @@ class SokobanSolver:
         Obstacles are generally walls, but can be boxes if box
         already checked in deadlocks.
 
-        :param box_y:
-        :param box_x:
-        :param obstacles:
-        :return:
+        :param box_y: y coordinate of box.
+        :param box_x: x coordinate of box.
+        :param obstacles: obstacle coordinates of current sokoban map.
+        :return: True if box is blocked vertically (y-axis).
         """
         # Check vertical directions.
         if (box_y - 1, box_x) in obstacles or (box_y + 1, box_x) in obstacles:
@@ -438,16 +450,21 @@ class SokobanSolver:
         return False
 
 
-
-
 def main(arglist: List[str]):
-    if len(arglist) != 2:
+    if len(arglist) < 2:
         print("Sokoban Solver needs an input file and an output file name.")
-        print("Usage: sokoban_solver.py [map_file_name] [solution_file_name]")
+        print("Usage: sokoban_solver.py "
+              "[map_file_name] [solution_file_name] [optional strategy = 'UCS' or 'AStar']")
         return
-    input_file = arglist[0]
-    output_file = arglist[1]
-    sokoban_solver = SokobanSolver(input_file, output_file)
+    elif len(arglist) == 2:
+        input_file = arglist[0]
+        output_file = arglist[1]
+        sokoban_solver = SokobanSolver(input_file, output_file)
+    elif len(arglist) == 3:
+        input_file = arglist[0]
+        output_file = arglist[1]
+        search_strategy = str(arglist[2]).upper()
+        sokoban_solver = SokobanSolver(input_file, output_file, search_strategy)
     sokoban_solver.solve_sokoban()
 
 

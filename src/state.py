@@ -41,3 +41,11 @@ class State:
 
     def __eq__(self, o):
         return self.box_positions == o.box_positions and self.player_position == o.player_position
+
+    def __hash__(self):
+        if len(self.box_positions) > 1:
+            temp = tuple(map(sum, self.box_positions))
+        else:
+            temp = self.box_positions[0]
+        current_sum = temp[0] + self.player_position[0] + temp[1] + self.player_position[1]
+        return current_sum
