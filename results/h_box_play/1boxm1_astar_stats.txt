@@ -1,5 +1,0 @@
-A* Took: 0.007983684539794922 secs
-Path (7 steps): l,d,d,r,d,l,l
-Number of nodes generated: 116
-Number of frontier nodes left: 41
-Number of visited nodes: 37
