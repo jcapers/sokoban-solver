@@ -1,0 +1,5 @@
+Path (30 steps): d,d,r,r,u,u,u,u,d,d,d,d,l,l,u,u,r,l,d,d,r,r,u,u,u,d,l,l,d,r
+Number of nodes generated: 567
+Number of frontier nodes left: 27
+Number of visited nodes: 246
+AStar Time: 0.01695418357849121 secs
