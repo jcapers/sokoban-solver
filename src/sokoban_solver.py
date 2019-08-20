@@ -124,6 +124,7 @@ class SokobanSolver:
         self.nodes_generated = 0
         # Initialise min priority queue with the starting state, and reset.
         heapq.heappush(self.frontier, (self.initial_state.cost, self.initial_state))
+        # costs_table = {}
 
         while self.frontier:
             # Get state, if not goal find new states.
@@ -144,6 +145,10 @@ class SokobanSolver:
                 f_cost = state.cost + state.h_cost
                 # Only push to heap if not already visited and not already in heap.
                 if not self.visited.get(state, False):
+                    # old_cost = costs_table.get(state, -10000)
+                    # if f_cost < old_cost:
+                    #     self.frontier.remove((old_cost, state))
+                    #     heapq.heapify(self.frontier)
                 # if state not in self.visited:
                     for old_cost, old_state in self.frontier:
                         # Remove same state of higher cost.
@@ -152,6 +157,7 @@ class SokobanSolver:
                             heapq.heapify(self.frontier)
                             break
                     heapq.heappush(self.frontier, (f_cost, state))
+                    # costs_table[state] = f_cost
         return None
 
     def goal_test(self, state):
