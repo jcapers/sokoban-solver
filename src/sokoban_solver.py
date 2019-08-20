@@ -319,6 +319,7 @@ class SokobanSolver:
         # Prepare some variables for ease
         goals = self.sokoban_map.tgt_positions
         obstacles = self.sokoban_map.obstacle_map
+        obstacle_symbol = self.sokoban_map.OBSTACLE_SYMBOL
         x_edges = (1, self.sokoban_map.x_size - 2)
         y_edges = (1, self.sokoban_map.y_size - 2)
 
@@ -329,7 +330,6 @@ class SokobanSolver:
                 return True
         # Freeze deadlock can be checked now, as edge case passed.
         elif self.deadlock_freeze_check(box_y, box_x, obstacles, state):
-            print(f'Freeze deadlock true: {box_y, box_x}, cost: {state.cost}, h: {state.h_cost}')
             return True
 
         return False
@@ -353,6 +353,7 @@ class SokobanSolver:
         """
         goals_x = [x for y, x in goals]
         goals_y = [y for y, x in goals]
+        wall = self.sokoban_map.OBSTACLE_SYMBOL
         # If the box is against a wall of the map then it can only traverse along this wall.
         # Check sides
         if box_x == x_edges[0] or box_x == x_edges[1]:
@@ -360,16 +361,18 @@ class SokobanSolver:
             if box_x not in goals_x:
                 return True
             # Goal is in line, but blocked so can't push. Other boxes would also be stuck against wall.
-            elif (box_y - 1, box_x) in (obstacles or state.box_positions) \
-                    or (box_y + 1, box_x) in (obstacles or state.box_positions):
+            elif self.blocked_vertical(box_y, box_x, obstacles) or \
+                    (box_y - 1, box_x) in state.box_positions or \
+                    (box_y + 1, box_x) in state.box_positions:
                 return True
 
         # Check top/bottom
         if box_y == y_edges[0] or box_y == y_edges[1]:
             if box_y not in goals_y:
                 return True
-            elif (box_y, box_x - 1) in (obstacles or state.box_positions) \
-                    or (box_y, box_x + 1) in (obstacles or state.box_positions):
+            elif self.blocked_horizontal(box_y, box_x, obstacles) or \
+                    (box_y, box_x - 1) in state.box_positions or \
+                    (box_y, box_x + 1) in state.box_positions:
                 return True
 
         # Safe!
@@ -381,6 +384,11 @@ class SokobanSolver:
 
         Uses blocked_horizontal and blocked_vertical to check blockages.
 
+        If a box is detected, convert current box into a wall and check if blocking box is blocked. The wall conversion
+        for the temporary obstacle list is required to avoid circular checks.
+
+        This function makes use of the provided sokoban_map.py script/classes.
+
         :param box_y: y position of box.
         :param box_x: x position of box.
         :param obstacles: obstacle coordinates on current sokoban map.
@@ -389,33 +397,34 @@ class SokobanSolver:
         """
         # Deep copy of list in case we need to add boxes.
         obstacles_check_list = obstacles[:]
+        wall = self.sokoban_map.OBSTACLE_SYMBOL
         # Check horizontal directions.
         if self.blocked_horizontal(box_y, box_x, obstacles_check_list):
             # If one horizontal direction is blocked by a wall, check vertical.
             if self.blocked_vertical(box_y, box_x, obstacles_check_list):
                 return True
             # If vertical is not blocked, check if a box is in a vertical space (and not temporarily treated as a wall)
-            elif (box_y - 1, box_x) in state.box_positions and not (box_y - 1, box_x) in obstacles_check_list:
-                obstacles_check_list.append((box_y, box_x))
+            elif (box_y - 1, box_x) in state.box_positions and not obstacles_check_list[box_y - 1][box_x] == wall:
                 # Treat THIS box as a standard obstacle to avoid circular checks.
-                if self.deadlock_freeze_check(box_y - 1, box_x, obstacles_check_list, state):
+                obstacles_check_list[box_y][box_x] == wall
+                if self.deadlock_freeze_check(box_y - 1, box_x, obstacles_check_list[:], state):
                     return True
-            elif (box_y + 1, box_x) in state.box_positions and not (box_y + 1, box_x) in obstacles_check_list:
-                obstacles_check_list.append((box_y, box_x))
-                if self.deadlock_freeze_check(box_y + 1, box_x, obstacles_check_list, state):
+            elif (box_y + 1, box_x) in state.box_positions and not obstacles_check_list[box_y + 1][box_x] == wall:
+                obstacles_check_list[box_y][box_x] == wall
+                if self.deadlock_freeze_check(box_y + 1, box_x, obstacles_check_list[:], state):
                     return True
 
         # Check vertical directions, similar to horizontal check but reversed.
         if self.blocked_vertical(box_y, box_x, obstacles_check_list):
             if self.blocked_horizontal(box_y, box_x, obstacles_check_list):
                 return True
-            elif (box_y, box_x - 1) in state.box_positions and not (box_y, box_x - 1) in obstacles_check_list:
-                obstacles_check_list.append((box_y, box_x))
-                if self.deadlock_freeze_check(box_y, box_x - 1, obstacles_check_list, state):
+            elif (box_y, box_x - 1) in state.box_positions and not obstacles_check_list[box_y][box_x - 1] == wall:
+                obstacles_check_list[box_y][box_x] == wall
+                if self.deadlock_freeze_check(box_y, box_x - 1, obstacles_check_list[:], state):
                     return True
-            elif (box_y, box_x + 1) in state.box_positions and not (box_y, box_x + 1) in obstacles_check_list:
-                obstacles_check_list.append((box_y, box_x))
-                if self.deadlock_freeze_check(box_y, box_x + 1, obstacles_check_list, state):
+            elif (box_y, box_x + 1) in state.box_positions and not obstacles_check_list[box_y][box_x + 1] == wall:
+                obstacles_check_list[box_y][box_x] == wall
+                if self.deadlock_freeze_check(box_y, box_x + 1, obstacles_check_list[:], state):
                     return True
 
         # Got here, so not blocked.
@@ -433,8 +442,9 @@ class SokobanSolver:
         :param obstacles: obstacle coordinates of current sokoban map.
         :return: True if box is blocked horizontally (x-axis).
         """
+        wall = self.sokoban_map.OBSTACLE_SYMBOL
         # Check horizontal directions.
-        if (box_y, box_x - 1) in obstacles or (box_y, box_x + 1) in obstacles:
+        if obstacles[box_y][box_x - 1] == wall or obstacles[box_y][box_x + 1] == wall:
             return True
         return False
 
@@ -450,8 +460,9 @@ class SokobanSolver:
         :param obstacles: obstacle coordinates of current sokoban map.
         :return: True if box is blocked vertically (y-axis).
         """
+        wall = self.sokoban_map.OBSTACLE_SYMBOL
         # Check vertical directions.
-        if (box_y - 1, box_x) in obstacles or (box_y + 1, box_x) in obstacles:
+        if obstacles[box_y - 1][box_x] == wall or obstacles[box_y + 1][box_x] == wall:
             return True
         return False
 
