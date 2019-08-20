@@ -34,7 +34,7 @@ class SearchStrategy(Enum):
 class SokobanSolver:
     """Sokoban Solver, utilises Uniform Cost Search OR A* Search."""
 
-    def __init__(self, input_filename: str, output_filename: str, search_strategy: str = 'AStar'):
+    def __init__(self, input_filename: str, output_filename: str, search_strategy: str = 'ASTAR'):
         self.map_file = input_filename
         self.output_file = output_filename
 
@@ -473,7 +473,7 @@ def main(arglist: List[str]):
     if len(arglist) < 2:
         print("Sokoban Solver needs an input file and an output file name.")
         print("Usage: sokoban_solver.py "
-              "[map_file_name] [solution_file_name] [optional strategy = 'UCS' or 'AStar']")
+              "[map_file_name] [solution_file_name] [optional strategy = 'UCS' or 'ASTAR']")
         return
     elif len(arglist) == 2:
         input_file = arglist[0]
