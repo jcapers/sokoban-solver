@@ -1,0 +1,5 @@
+Path (13 steps): u,u,l,l,d,d,l,l,u,l,l,d,r
+Number of nodes generated: 90
+Number of frontier nodes left: 0
+Number of visited nodes: 43
+UCS Time: 0.0009691715240478516 secs

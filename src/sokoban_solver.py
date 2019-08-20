@@ -195,7 +195,7 @@ class SokobanSolver:
 
         # Player
         player_costs = [self.manhattan_distance(player, box) for box in boxes]
-        h_cost += min(player_costs)
+        h_cost += max(player_costs)
 
         # Boxes
         for box in boxes:
@@ -299,7 +299,10 @@ class SokobanSolver:
 
         # If a box has been moved, check if the box is now deadlocked, okay if it's in a goal position.
         if box_moved and (new_box_y, new_box_x) not in self.sokoban_map.tgt_positions:
-            if self.deadlock_test(new_box_y, new_box_x, state):
+            boxes = state.box_positions[:]
+            boxes.remove((new_y, new_x))
+            boxes.append((new_box_y, new_box_x))
+            if self.deadlock_test(new_box_y, new_box_x, boxes):
                 return False
         # Create new state
         new_box_positions = state.box_positions[:]
@@ -308,39 +311,39 @@ class SokobanSolver:
             new_box_positions.append((new_box_y, new_box_x))
         return State(state, new_box_positions, (new_y, new_x), move)
 
-    def deadlock_test(self, box_y, box_x, state):
+    def deadlock_test(self, box_y, box_x, boxes):
         """
         Test if a deadlock exists with box position.
         :param box_y: y coordinate for box.
         :param box_x: x coordinate for box.
-        :param state: current state we are checking for deadlocks in.
+        :param boxes: list of box positions in proposed new state.
         :return: True if deadlock detected.
         """
         # Prepare some variables for ease
-        goals = self.sokoban_map.tgt_positions
-        obstacles = self.sokoban_map.obstacle_map
-        obstacle_symbol = self.sokoban_map.OBSTACLE_SYMBOL
+        goals = self.sokoban_map.tgt_positions[:]
+        obstacles = self.sokoban_map.obstacle_map[:]
+
         x_edges = (1, self.sokoban_map.x_size - 2)
         y_edges = (1, self.sokoban_map.y_size - 2)
 
         # Check all deadlock cases
         if box_y in y_edges or box_x in x_edges:
             # Special deadlock case if box is against edge of map.
-            if self.deadlock_wall_check(box_y, box_x, x_edges, y_edges, goals, obstacles, state):
+            if self.deadlock_map_edge(box_y, box_x, x_edges, y_edges, goals, obstacles, boxes):
                 return True
         # Freeze deadlock can be checked now, as edge case passed.
-        elif self.deadlock_freeze_check(box_y, box_x, obstacles, state):
+        elif self.deadlock_freeze_check(box_y, box_x, obstacles, boxes):
             return True
 
         return False
 
-    def deadlock_wall_check(self, box_y, box_x, x_edges, y_edges, goals, obstacles, state):
+    def deadlock_map_edge(self, box_y, box_x, x_edges, y_edges, goals, obstacles, boxes):
         """
-        Simple check to see if a box can reach the target from the walls, if not
-        then it will never be pushable off the wall.
+        Simple check to see if a box can reach the target from the edge of map, if not
+        then it will never be pushable off the wall so will fail.
 
-        1) If a box is against the walls, then it can only move to targets also against the walls.
-        2) If the box is against a wall then it may be blocked by other obstacles or boxes.
+        1) If a box is against the walls, then it can only move to targets also against the walls
+           on the strict edges of the map (e.g., a square map).
 
         :param box_y: y coordinate of box.
         :param box_x: x coordinate of box.
@@ -348,22 +351,20 @@ class SokobanSolver:
         :param y_edges: general y positions at edge of map that is traversable.
         :param goals: list containing goal/target coordinates.
         :param obstacles: list containing obstacle coordinates.
-        :param state: current state we are checking for deadlocks in.
+        :param boxes: list of boxes in proposed new state.
         :return: True if deadlocked, else False.
         """
         goals_x = [x for y, x in goals]
         goals_y = [y for y, x in goals]
-        wall = self.sokoban_map.OBSTACLE_SYMBOL
         # If the box is against a wall of the map then it can only traverse along this wall.
         # Check sides
         if box_x == x_edges[0] or box_x == x_edges[1]:
             # Goal not on same side/column, impossible to reach goal.
             if box_x not in goals_x:
                 return True
-            # Goal is in line, but blocked so can't push. Other boxes would also be stuck against wall.
             elif self.blocked_vertical(box_y, box_x, obstacles) or \
-                    (box_y - 1, box_x) in state.box_positions or \
-                    (box_y + 1, box_x) in state.box_positions:
+                    (box_y - 1, box_x) in boxes or \
+                    (box_y + 1, box_x) in boxes:
                 return True
 
         # Check top/bottom
@@ -371,14 +372,14 @@ class SokobanSolver:
             if box_y not in goals_y:
                 return True
             elif self.blocked_horizontal(box_y, box_x, obstacles) or \
-                    (box_y, box_x - 1) in state.box_positions or \
-                    (box_y, box_x + 1) in state.box_positions:
+                    (box_y, box_x - 1) in boxes or \
+                    (box_y, box_x + 1) in boxes:
                 return True
 
         # Safe!
         return False
 
-    def deadlock_freeze_check(self, box_y, box_x, obstacles, state):
+    def deadlock_freeze_check(self, box_y, box_x, obstacles, boxes):
         """
         Checks freeze deadlock case [3].
 
@@ -392,40 +393,41 @@ class SokobanSolver:
         :param box_y: y position of box.
         :param box_x: x position of box.
         :param obstacles: obstacle coordinates on current sokoban map.
-        :param state: current state we are finding successors for.
+        :param boxes: list of boxes in proposed new state.
         :return: True if a freeze deadlock is detected.
         """
         # Deep copy of list in case we need to add boxes.
-        obstacles_check_list = obstacles[:]
+        obstacles_check_list = obstacles
         wall = self.sokoban_map.OBSTACLE_SYMBOL
         # Check horizontal directions.
         if self.blocked_horizontal(box_y, box_x, obstacles_check_list):
             # If one horizontal direction is blocked by a wall, check vertical.
             if self.blocked_vertical(box_y, box_x, obstacles_check_list):
+                # The box can't move since two directions are blocked by obstacles.
                 return True
             # If vertical is not blocked, check if a box is in a vertical space (and not temporarily treated as a wall)
-            elif (box_y - 1, box_x) in state.box_positions and not obstacles_check_list[box_y - 1][box_x] == wall:
-                # Treat THIS box as a standard obstacle to avoid circular checks.
-                obstacles_check_list[box_y][box_x] == wall
-                if self.deadlock_freeze_check(box_y - 1, box_x, obstacles_check_list[:], state):
-                    return True
-            elif (box_y + 1, box_x) in state.box_positions and not obstacles_check_list[box_y + 1][box_x] == wall:
-                obstacles_check_list[box_y][box_x] == wall
-                if self.deadlock_freeze_check(box_y + 1, box_x, obstacles_check_list[:], state):
-                    return True
+            # elif (box_y - 1, box_x) in boxes:
+            #     # Treat THIS box as a standard obstacle to avoid circular checks.
+            #     obstacles_check_list[box_y][box_x] = wall
+            #     if self.deadlock_freeze_check(box_y - 1, box_x, obstacles_check_list, boxes):
+            #         return True
+            # elif (box_y + 1, box_x) in boxes:
+            #     obstacles_check_list[box_y][box_x] = wall
+            #     if self.deadlock_freeze_check(box_y + 1, box_x, obstacles_check_list, boxes):
+            #         return True
 
         # Check vertical directions, similar to horizontal check but reversed.
         if self.blocked_vertical(box_y, box_x, obstacles_check_list):
             if self.blocked_horizontal(box_y, box_x, obstacles_check_list):
                 return True
-            elif (box_y, box_x - 1) in state.box_positions and not obstacles_check_list[box_y][box_x - 1] == wall:
-                obstacles_check_list[box_y][box_x] == wall
-                if self.deadlock_freeze_check(box_y, box_x - 1, obstacles_check_list[:], state):
-                    return True
-            elif (box_y, box_x + 1) in state.box_positions and not obstacles_check_list[box_y][box_x + 1] == wall:
-                obstacles_check_list[box_y][box_x] == wall
-                if self.deadlock_freeze_check(box_y, box_x + 1, obstacles_check_list[:], state):
-                    return True
+            # elif (box_y, box_x - 1) in boxes:
+            #     obstacles_check_list[box_y][box_x] = wall
+            #     if self.deadlock_freeze_check(box_y, box_x - 1, obstacles_check_list, boxes):
+            #         return True
+            # elif (box_y, box_x + 1) in boxes:
+            #     obstacles_check_list[box_y][box_x] = wall
+            #     if self.deadlock_freeze_check(box_y, box_x + 1, obstacles_check_list, boxes):
+            #         return True
 
         # Got here, so not blocked.
         return False
