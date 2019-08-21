@@ -1,0 +1,2 @@
+u,u,r,r,u,r,d,d,r,d,l,u,u,l,l,l,l,l,d,d,l,l,u,l,l,d,r
+Nodes Gen.: 4853, Fringe: 235, Explored: 1856, Time: 0.3222 secs, Path: 27

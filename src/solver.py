@@ -1,3 +1,4 @@
+from copy import deepcopy
 from enum import Enum
 from typing import List, Tuple
 import heapq
@@ -47,9 +48,9 @@ class SokobanSolver:
 
         # Setup for search
         self.search_strategy = search_strategy
-        self.initial_state = State(None, self.sokoban_map.box_positions[:], self.sokoban_map.player_position)
+        self.initial_state = State(None, deepcopy(self.sokoban_map.box_positions), self.sokoban_map.player_position)
         self.frontier = []
-        self.visited = {}
+        self.visited = set([])
         self.nodes_generated = 0
 
     def solve_sokoban(self):
@@ -77,21 +78,14 @@ class SokobanSolver:
             end = time.time()
 
         # Output Path
-        print(f'Path ({len(path)}) steps: {path}')
-        output_path = f'{self.output_file}_{self.search_strategy}_path.txt'
+        print(",".join(path))
+        stats = f'\nNodes Gen.: {self.nodes_generated}, Fringe: {len(self.frontier)}, Explored: {len(self.visited)}, Time: {round(end - start, 4)} secs, Path: {len(path)}'
+        print(stats)
+        output_path = f'{self.output_file}_{self.search_strategy}.txt'
         with open(output_path, 'w+') as f:
-            f.write(",".join(path))
-
-        # Output Stats
-        print(f'Nodes Gen.: {self.nodes_generated}, Fringe: {len(self.frontier)}, Explored: {len(self.visited)}, Time: {round(end-start, 4)} secs')
-        stats_path = f'{self.output_file}_{self.search_strategy}_stats.txt'
-        with open(stats_path, 'w+') as f:
-            f.write(f'Path ({len(path)} steps): {",".join(path)}\n')
-            f.write(f'Number of nodes generated: {self.nodes_generated}\n')
-            f.write(f'Number of frontier nodes left: {len(self.frontier)}\n')
-            f.write(f'Number of visited nodes: {len(self.visited)}\n')
-            f.write(f'{self.search_strategy} Time: {end - start} secs\n')
-        print(f'Path saved to {output_path}, Stats to {stats_path}')
+            f.writelines(",".join(path))
+            f.writelines(stats)
+        print(f'Output file: {output_path}')
 
     def find_path(self, final_state):
         """
@@ -124,14 +118,14 @@ class SokobanSolver:
         self.nodes_generated = 0
         # Initialise min priority queue with the starting state, and reset.
         heapq.heappush(self.frontier, (self.initial_state.cost, self.initial_state))
-        # costs_table = {}
 
         while self.frontier:
             # Get state, if not goal find new states.
             cost, current_state = heapq.heappop(self.frontier)
             if self.goal_test(current_state):
                 return current_state
-            self.visited[current_state] = current_state
+            self.visited.add(current_state)
+            # self.visited[current_state] = current_state
             next_states = self.next_states(current_state)
             self.nodes_generated += len(next_states)
 
@@ -144,12 +138,9 @@ class SokobanSolver:
             for state in next_states:
                 f_cost = state.cost + state.h_cost
                 # Only push to heap if not already visited and not already in heap.
-                if not self.visited.get(state, False):
-                    # old_cost = costs_table.get(state, -10000)
-                    # if f_cost < old_cost:
-                    #     self.frontier.remove((old_cost, state))
-                    #     heapq.heapify(self.frontier)
-                # if state not in self.visited:
+                # visited is a set, so O(1) average time.
+                if state not in self.visited:
+                    # Seems faster than using a cost dictionary.
                     for old_cost, old_state in self.frontier:
                         # Remove same state of higher cost.
                         if state == old_state and f_cost <= old_cost:
@@ -157,7 +148,6 @@ class SokobanSolver:
                             heapq.heapify(self.frontier)
                             break
                     heapq.heappush(self.frontier, (f_cost, state))
-                    # costs_table[state] = f_cost
         return None
 
     def goal_test(self, state):
@@ -195,7 +185,7 @@ class SokobanSolver:
 
         # Player
         player_costs = [self.manhattan_distance(player, box) for box in boxes]
-        h_cost += max(player_costs)
+        h_cost += min(player_costs)
 
         # Boxes
         for box in boxes:
@@ -297,18 +287,14 @@ class SokobanSolver:
                     new_box_x = new_x
                     box_moved = True
 
-        # If a box has been moved, check if the box is now deadlocked, okay if it's in a goal position.
-        if box_moved and (new_box_y, new_box_x) not in self.sokoban_map.tgt_positions:
-            boxes = state.box_positions[:]
-            boxes.remove((new_y, new_x))
-            boxes.append((new_box_y, new_box_x))
-            if self.deadlock_test(new_box_y, new_box_x, boxes):
-                return False
         # Create new state
-        new_box_positions = state.box_positions[:]
+        new_box_positions = deepcopy(state.box_positions)
         if box_moved:
             new_box_positions.remove((new_y, new_x))
             new_box_positions.append((new_box_y, new_box_x))
+            # If a box has been moved, check if the box is now deadlocked, okay if it's in a goal position.
+            if self.deadlock_test(new_box_y, new_box_x, new_box_positions):
+                return False
         return State(state, new_box_positions, (new_y, new_x), move)
 
     def deadlock_test(self, box_y, box_x, boxes):
@@ -320,8 +306,8 @@ class SokobanSolver:
         :return: True if deadlock detected.
         """
         # Prepare some variables for ease
-        goals = self.sokoban_map.tgt_positions[:]
-        obstacles = self.sokoban_map.obstacle_map[:]
+        goals = self.sokoban_map.tgt_positions
+        obstacles = self.sokoban_map.obstacle_map
 
         x_edges = (1, self.sokoban_map.x_size - 2)
         y_edges = (1, self.sokoban_map.y_size - 2)
@@ -329,9 +315,11 @@ class SokobanSolver:
         # Check all deadlock cases
         if box_y in y_edges or box_x in x_edges:
             # Special deadlock case if box is against edge of map.
-            if self.deadlock_map_edge(box_y, box_x, x_edges, y_edges, goals, obstacles, boxes):
+            if (box_y, box_x) not in goals and self.deadlock_map_edge(box_y, box_x, x_edges, y_edges, goals, obstacles, boxes):
                 return True
         # Freeze deadlock can be checked now, as edge case passed.
+        elif (box_y, box_x) not in goals and self.deadlock_obstacle_blocks(box_y, box_x, obstacles, boxes):
+            return True
         elif self.deadlock_freeze_check(box_y, box_x, obstacles, boxes):
             return True
 
@@ -362,6 +350,8 @@ class SokobanSolver:
             # Goal not on same side/column, impossible to reach goal.
             if box_x not in goals_x:
                 return True
+            # At this point, since we are at a definite edge if the map has allowed it
+            # Any other box will also get stuck, so consider those as well as another wall.
             elif self.blocked_vertical(box_y, box_x, obstacles) or \
                     (box_y - 1, box_x) in boxes or \
                     (box_y + 1, box_x) in boxes:
@@ -379,57 +369,117 @@ class SokobanSolver:
         # Safe!
         return False
 
+    def deadlock_obstacle_blocks(self, box_y, box_x, obstacles, boxes):
+        """
+        Checks whether a box is trapped by obstacles on both axis, e.g, a corner anywhere on the map.
+
+        :param box_y: y position of box.
+        :param box_x: x position of box.
+        :param obstacles: a copy of obstacle coordinates on current sokoban map.
+        :param boxes: list of boxes in proposed new state.
+        :return: True if a deadlock is detected.
+        """
+        # Check opposite axis blocks
+        #   #
+        #   B#
+        # Doesn't matter which sides, as long as it's blocked in opposite axis.
+        if self.blocked_horizontal(box_y, box_x, obstacles):
+            # If one horizontal direction is blocked by a wall, check vertical.
+            if self.blocked_vertical(box_y, box_x, obstacles):
+                # The box can't move since two directions are blocked by obstacles.
+                return True
+            # If not blocked vertically, maybe there is a box that is blocked by an obstacle.
+            # Example:
+            #   #B   ... #B
+            #    B#  ... #B  etc
+            elif (box_y - 1, box_x) in boxes and self.blocked_horizontal(box_y - 1, box_x, obstacles):
+                return True
+            elif (box_y + 1, box_x) in boxes and self.blocked_horizontal(box_y + 1, box_x, obstacles):
+                return True
+        elif self.blocked_vertical(box_y, box_x, obstacles):
+            if self.blocked_horizontal(box_y, box_x, obstacles):
+                return True
+            elif (box_y, box_x - 1) in boxes and self.blocked_vertical(box_y, box_x - 1, obstacles):
+                return True
+            elif (box_y, box_x + 1) in boxes and self.blocked_vertical(box_y, box_x + 1, obstacles):
+                return True
+        return False
+
     def deadlock_freeze_check(self, box_y, box_x, obstacles, boxes):
         """
         Checks freeze deadlock case [3].
 
-        Uses blocked_horizontal and blocked_vertical to check blockages.
+        If a box is detected that may block current box, convert current box into a wall
+        and check if blocking box is blocked.
 
-        If a box is detected, convert current box into a wall and check if blocking box is blocked. The wall conversion
-        for the temporary obstacle list is required to avoid circular checks.
+        The wall conversion for the temporary obstacle list is required to avoid circular checks.
+
+        Intention is to detect when boxes come together and block each other from moving.
 
         This function makes use of the provided sokoban_map.py script/classes.
 
         :param box_y: y position of box.
         :param box_x: x position of box.
-        :param obstacles: obstacle coordinates on current sokoban map.
+        :param obstacles: a copy of obstacle coordinates on current sokoban map.
         :param boxes: list of boxes in proposed new state.
         :return: True if a freeze deadlock is detected.
         """
-        # Deep copy of list in case we need to add boxes.
-        obstacles_check_list = obstacles
+        # Temporary obstacle holder - we may need to add boxes as 'obstacles'
         wall = self.sokoban_map.OBSTACLE_SYMBOL
-        # Check horizontal directions.
-        if self.blocked_horizontal(box_y, box_x, obstacles_check_list):
-            # If one horizontal direction is blocked by a wall, check vertical.
-            if self.blocked_vertical(box_y, box_x, obstacles_check_list):
-                # The box can't move since two directions are blocked by obstacles.
-                return True
-            # If vertical is not blocked, check if a box is in a vertical space (and not temporarily treated as a wall)
-            # elif (box_y - 1, box_x) in boxes:
-            #     # Treat THIS box as a standard obstacle to avoid circular checks.
-            #     obstacles_check_list[box_y][box_x] = wall
-            #     if self.deadlock_freeze_check(box_y - 1, box_x, obstacles_check_list, boxes):
-            #         return True
-            # elif (box_y + 1, box_x) in boxes:
-            #     obstacles_check_list[box_y][box_x] = wall
-            #     if self.deadlock_freeze_check(box_y + 1, box_x, obstacles_check_list, boxes):
-            #         return True
 
-        # Check vertical directions, similar to horizontal check but reversed.
-        if self.blocked_vertical(box_y, box_x, obstacles_check_list):
-            if self.blocked_horizontal(box_y, box_x, obstacles_check_list):
-                return True
-            # elif (box_y, box_x - 1) in boxes:
-            #     obstacles_check_list[box_y][box_x] = wall
-            #     if self.deadlock_freeze_check(box_y, box_x - 1, obstacles_check_list, boxes):
-            #         return True
-            # elif (box_y, box_x + 1) in boxes:
-            #     obstacles_check_list[box_y][box_x] = wall
-            #     if self.deadlock_freeze_check(box_y, box_x + 1, obstacles_check_list, boxes):
-            #         return True
+        # Checking only relative to box 1.
+        box1y, box1x = box_y, box_x
+        # If there are 4 boxes stacked together we are done. W=wall, boxes numbered.
+        # 4 3 ... 4 3 ... 4 W ... W 3
+        # 1 2 ... 1 W ... 1 2 ... 1 2
+        if {(box1y, box1x), (box1y, box1x + 1), (box1y - 1, box1x + 1), (box1y - 1, box1x)} == set(self.sokoban_map.tgt_positions):
+            return False
+        elif (box1y, box1x + 1) in boxes and (box1y - 1, box1x + 1) in boxes and (box1y - 1, box1x) in boxes:
+            return True
+        elif obstacles[box1y][box1x + 1] == wall and (box1y - 1, box1x + 1) in boxes and (box1y - 1, box1x) in boxes:
+            return True
+        elif (box1y, box1x + 1) in boxes and obstacles[box1y - 1][box1x + 1] == wall and (box1y - 1, box1x) in boxes:
+            return True
+        elif (box1y, box1x + 1) in boxes and (box1y - 1, box1x + 1) in boxes and obstacles[box1y - 1][box1x] in boxes:
+            return True
+        # 3 4 .. 3 4 .. W 4 .. 3 W
+        # 2 1 .. W 1 .. 2 1 .. 2 1
+        if {(box1y, box1x), (box1y, box1x - 1), (box1y - 1, box1x - 1), (box1y - 1, box1x)} == set(self.sokoban_map.tgt_positions):
+            return False
+        elif (box1y, box_x - 1) in boxes and (box1y - 1, box_x - 1) in boxes and (box1y - 1, box_x) in boxes:
+            return True
+        elif obstacles[box1y][box_x - 1] == wall and (box1y - 1, box_x - 1) in boxes and (box1y - 1, box_x) in boxes:
+            return True
+        elif (box1y, box_x - 1) in boxes and obstacles[box1y - 1][box_x - 1] == wall and (box1y - 1, box_x) in boxes:
+            return True
+        elif (box1y, box_x - 1) in boxes and (box1y - 1, box_x - 1) in boxes and obstacles[box1y - 1][box_x] == wall:
+            return True
+        # 1 2 .. 1 W .. 1 2 .. 1 2
+        # 4 3 .. 4 3 .. 4 W .. W 4
+        if {(box1y, box1x), (box1y, box1x + 1), (box1y + 1, box1x + 1), (box1y + 1, box1x)} == set(self.sokoban_map.tgt_positions):
+            return False
+        elif (box1y, box1x + 1) in boxes and (box1y + 1, box1x + 1) in boxes and (box1y + 1, box1x) in boxes:
+            return True
+        elif obstacles[box1y][box1x + 1] == wall and (box1y + 1, box1x + 1) in boxes and (box1y + 1, box1x) in boxes:
+            return True
+        elif (box1y, box1x + 1) in boxes and obstacles[box1y + 1][box1x + 1] == wall and (box1y + 1, box1x) in boxes:
+            return True
+        elif (box1y, box1x + 1) in boxes and (box1y + 1, box1x + 1) in boxes and obstacles[box1y + 1][box1x] == wall:
+            return True
+        # 2 1 .. W 1 .. 2 1 .. 2 1
+        # 3 4 .. 3 4 .. W 4 .. 3 W
+        if {(box1y, box1x), (box1y, box1x - 1), (box1y + 1, box1x - 1), (box1y + 1, box1x)} == set(self.sokoban_map.tgt_positions):
+            return False
+        elif (box1y, box1x - 1) in boxes and (box1y + 1, box1x - 1) in boxes and (box1y + 1, box1x) in boxes:
+            return True
+        elif obstacles[box1y][box1x - 1] == wall and (box1y + 1, box1x - 1) in boxes and (box1y + 1, box1x) in boxes:
+            return True
+        elif (box1y, box1x - 1) in boxes and obstacles[box1y + 1][box1x - 1] == wall and (box1y + 1, box1x) in boxes:
+            return True
+        elif (box1y, box1x - 1) in boxes and (box1y + 1, box1x - 1) in boxes and obstacles[box1y + 1][box1x] == wall:
+            return True
 
-        # Got here, so not blocked.
+        # No deadlock detected.
         return False
 
     def blocked_horizontal(self, box_y, box_x, obstacles):
