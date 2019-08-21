@@ -1,2 +1,0 @@
-l,l,u,l,l,d,u,r,r,d,d,l,l,l,d,l,l,u,u,r,d,d,l,d,r,r
-Nodes Gen.: 361, Fringe: 27, Explored: 136, Time: 0.006 secs, Path: 26

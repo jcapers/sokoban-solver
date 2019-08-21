@@ -1,2 +1,1 @@
 u,u,r,u,u,u,u,u,r,r,r,r,d,d,l,d,d,d,d,d,r,r,u,l,d,l,u,u,u,u,l,u,r,d,r,u,u,u,r,u,l,u,l,d,r,d,d,d,d,l,d,d,d,r,r,u,l,d,l,u,u,u,l,u,r,d,r,u,u,u,l,l,l,u,l,d,d,d,d,d,d,l,d,r,u,u,u,u,u,u,r,r,r,u,u,r,d,r,d,l,l,l,l,u,l,d,d,d,d,d,d,d,l,d,r
-Nodes Gen.: 26760, Fringe: 268, Explored: 10693, Time: 3.1546 secs, Path: 115

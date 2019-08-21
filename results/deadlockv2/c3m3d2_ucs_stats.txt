@@ -1,5 +1,0 @@
-UCS Took: 0.17555928230285645 secs
-Path (12 steps): r,u,r,r,d,l,l,l,r,d,r,d
-Number of nodes generated: 2087
-Number of frontier nodes left: 331
-Number of visited nodes: 761

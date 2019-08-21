@@ -79,13 +79,15 @@ class SokobanSolver:
 
         # Output Path
         print(",".join(path))
-        stats = f'\nNodes Gen.: {self.nodes_generated}, Fringe: {len(self.frontier)}, Explored: {len(self.visited)}, Time: {round(end - start, 4)} secs, Path: {len(path)}'
+        stats = f'Nodes Gen.: {self.nodes_generated}, Fringe: {len(self.frontier)}, Explored: {len(self.visited)}, Time: {round(end - start, 4)} secs, Path: {len(path)}'
         print(stats)
         output_path = f'{self.output_file}_{self.search_strategy}.txt'
+        stats_path = f'{self.output_file}_{self.search_strategy}_stats.txt'
         with open(output_path, 'w+') as f:
-            f.writelines(",".join(path))
-            f.writelines(stats)
-        print(f'Output file: {output_path}')
+            f.write(",".join(path))
+        with open(stats_path, 'w+') as f:
+            f.write(stats)
+        print(f'Output path file: {output_path}')
 
     def find_path(self, final_state):
         """

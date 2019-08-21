@@ -1,5 +1,0 @@
-Path (35 steps): u,r,r,r,r,u,u,d,d,d,l,u,l,l,l,d,d,r,r,u,d,l,l,u,u,r,r,r,d,r,u,u,r,u,l
-Number of nodes generated: 2255
-Number of frontier nodes left: 68
-Number of visited nodes: 999
-AStar Time: 0.07679462432861328 secs

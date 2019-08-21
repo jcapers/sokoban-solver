@@ -1,5 +1,0 @@
-Path (86 steps): d,d,d,u,r,r,d,l,l,u,u,u,r,d,l,d,d,r,r,u,l,d,l,u,l,l,d,r,r,u,r,u,u,l,d,r,d,l,d,l,d,d,r,u,u,u,r,r,d,l,u,l,d,l,d,d,r,u,l,u,l,u,r,r,r,d,l,r,u,u,u,l,d,d,l,d,d,u,u,r,r,d,l,u,l,d
-Number of nodes generated: 29058
-Number of frontier nodes left: 52
-Number of visited nodes: 11425
-UCS Time: 29.78309440612793 secs

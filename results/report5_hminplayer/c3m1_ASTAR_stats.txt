@@ -1,0 +1,1 @@
+Nodes Gen.: 347, Fringe: 16, Explored: 156, Time: 0.008 secs, Path: 30
